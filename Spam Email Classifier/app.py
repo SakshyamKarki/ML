@@ -1,27 +1,46 @@
 import streamlit as st
 import joblib
-import pandas as pd
+import numpy as np
 
-st.title("Spam Classification App")
+# ===== Load Models =====
+nb_model = joblib.load("model.pkl")
+count_vectorizer = joblib.load("vectorizer.pkl")
 
-model = joblib.load("model.pkl")
-vectorizer = joblib.load("vectorizer.pkl")
+svm_model = joblib.load("spam_model.pkl")      # calibrated SVM
+tfidf_vectorizer = joblib.load("tfidf.pkl")
 
-email = st.text_input("Email")
+# ===== UI =====
+st.title("📧 Spam Email Classifier")
+st.write("Choose a model and classify an email")
 
+model_choice = st.selectbox(
+    "Select Model",
+    ["Naive Bayes (CountVectorizer)", "SVM (TF-IDF)"]
+)
 
-if st.button("Classify Email"):
-    input_data = {
-        "text": email
-    }
+email_text = st.text_area("Enter Email Text")
 
-    df = pd.DataFrame([input_data])
-
-    text = vectorizer.transform(df["text"])
-
-    prediction = model.predict(text)[0]
-    if prediction == "spam":
-        st.error(f"Classified Email: {prediction}")
+# ===== Prediction =====
+if st.button("Predict"):
+    if email_text.strip() == "":
+        st.warning("Please enter email text")
     else:
-        st.success(f"Classified Email: {prediction}")
+        if model_choice == "Naive Bayes (CountVectorizer)":
+            vec = count_vectorizer.transform([email_text])
+            prediction = nb_model.predict(vec)[0]
+            prob = nb_model.predict_proba(vec)[0]
 
+            confidence = max(prob)
+
+        else:
+            vec = tfidf_vectorizer.transform([email_text])
+            prediction = svm_model.predict(vec)[0]
+            prob = svm_model.predict_proba(vec)[0]
+
+            confidence = max(prob)
+
+        label = "🚫 Spam" if prediction == 1 else "✅ Ham"
+
+        st.subheader("Result")
+        st.write("Prediction:", label)
+        st.write(f"Confidence: **{confidence * 100:.2f}%**")
